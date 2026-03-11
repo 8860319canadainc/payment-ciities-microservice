@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./config/env"; // load .env before any other local imports
 import express from "express";
 import pinoHttp from "pino-http";
 
@@ -9,7 +9,9 @@ import { errorHandler } from "./middleware/error.middleware";
 const app = express();
 
 app.use(pinoHttp());
-
+app.get("/", (req, res) => {
+  res.send("Payments service running");
+});
 /**
  * Stripe webhook MUST use raw body
  */
@@ -25,8 +27,17 @@ app.use("/webhooks", stripeWebhookRoute);
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Payments service running on port ${PORT}`);
+});
+
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use. Stop the other process or use a different PORT.`);
+  } else {
+    console.error("Server error:", err);
+  }
+  process.exit(1);
 });

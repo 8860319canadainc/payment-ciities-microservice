@@ -5,14 +5,19 @@ import { logger } from "../infrastructure/logger";
 const WEBHOOK_IDEMPOTENCY_TTL = 86400; // 24 hours
 
 export const processStripeEvent = async (event: Stripe.Event): Promise<void> => {
-  const key = `webhook:stripe:${event.id}`;
-  const exists = await redis.get(key);
-  if (exists) {
-    logger.info({ eventId: event.id }, "Webhook already processed (idempotent)");
-    return;
+  if (redis) {
+    try {
+      const key = `webhook:stripe:${event.id}`;
+      const exists = await redis.get(key);
+      if (exists) {
+        logger.info({ eventId: event.id }, "Webhook already processed (idempotent)");
+        return;
+      }
+      await redis.setex(key, WEBHOOK_IDEMPOTENCY_TTL, "1");
+    } catch (err) {
+      logger.warn({ err }, "Redis unavailable, processing webhook without idempotency");
+    }
   }
-
-  await redis.setex(key, WEBHOOK_IDEMPOTENCY_TTL, "1");
 
   switch (event.type) {
     case "payment_intent.succeeded":
